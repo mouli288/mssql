@@ -1,0 +1,41 @@
+# vars
+
+### File and Folder Paths ###
+
+# Powershell modules source and target
+source_ps_sqldsc_module_dir: \\SLVCEISL01V-PERF.uss.net\OPSDBA_FS_LOAD\Ansible\PSModules\
+target_ps_sqldsc_module_dir: C:\Program Files\WindowsPowerShell\Modules\
+
+# Powershell Nuget package provider source and target
+source_ps_nuget_dir: \\SLVCEISL01V-PERF.uss.net\OPSDBA_FS_LOAD\Ansible\NuGet\
+target_ps_nuget_dir: C:\Program Files\PackageManagement\ProviderAssemblies\
+
+# Post intall SQL Scripts source and target
+source_sqlscripts_dir: \\SLVCEISL01V-PERF.uss.net\OPSDBA_FS_LOAD\Ansible\SQLScripts\
+target_sqlscripts_dir: D:\Ansible\SQLScripts\
+target_sqlscripts_getdir: D:\Ansible\SQLScripts\get\
+target_sqlscripts_setdir: D:\Ansible\SQLScripts\set\
+target_sqlscripts_testdir: D:\Ansible\SQLScripts\test\
+target_sqlscripts_output_dir: D:\Ansible\OutputLogs\
+
+#DBMail Config
+dbmail_AccountName: 'rptsqlload'
+dbmail_ProfileName: 'DBA_Notifications'
+dbmail_EmailAddress: 'rptsqlload@incomm.com'
+dbmail_ReplyToAddress: 'no-reply@incomm.com'
+dbmail_DisplayName: 'rptsqlload'
+dbmail_MailServerName: 'DLP-SLLDB-C3.incomm.com'
+dbmail_Description: 'Account for Automated DBA Notifications of LOAD SQL Instances'
+
+# ServiceNow Account
+svc_tools_admin_account: CALLING\db.tools_svc_admin_accounts
+svc_tools_read_account: CALLING\db.tools_svc_read_accounts
+
+# Inventory Record Details
+inv_host: SDS00SQL02V
+inv_htype: SINGLE-NODE-CLUSTER
+inv_env: LOAD
+inv_loc: QTS
+inv_cat: 3
+inv_plat: SQLSERVER
+inv_dom: CALLING

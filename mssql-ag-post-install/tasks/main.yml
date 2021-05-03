@@ -1,0 +1,82 @@
+---
+#Main task file for mssql-clu-post-install
+
+- name: Execute Pre-Requisites
+  block:
+    - import_tasks: pre_tasks.yml
+  any_errors_fatal: true
+  tags: execute_pre_tasks
+
+- name: Windows | Get AG Primary Node
+  win_shell: | 
+    (get-clustergroup | where Name -Match 'AG_').ownernode.name
+  register: result_AGPrimaryNode
+  tags: get_AGPrimaryNode
+  check_mode: no
+
+- name: Windows | Set AG Primary Node as Fact
+  set_fact:
+    agfacts: "{{ result_AGPrimaryNode.stdout | regex_replace('(\\r\\n)','') }}"
+  tags: set_AGFacts
+
+- name: Ansible | Get & Set SQLFacts based on Cluster Active Node
+  block:
+    - name: SQLServer | Create Ansible AD Login
+      win_dsc:
+        resource_name: SqlLogin
+        ServerName: "{{ mssql_server_name }}"
+        InstanceName: "{{ mssql_instance_name }}"
+        Ensure: Present
+        LoginType: WindowsUser
+        Name: "{{ ansible_user }}" 
+      tags: create_AnsibleADLogin
+
+    - name: SQLServer | Add Roles to Ansible AD Login
+      win_dsc:
+        resource_name: SqlRole
+        ServerName: "{{ mssql_server_name }}"
+        InstanceName: "{{ mssql_instance_name }}"
+        Ensure: Present
+        ServerRoleName: sysadmin
+        MembersToInclude: "{{ ansible_user }}"
+      tags: add_RolestoAnsibleADLogin
+  any_errors_fatal: true
+  when: "agfacts == ansible_hostname"       
+
+- name: Get SQLServer Facts
+  win_shell: | 
+    Invoke-SqlCmd -InputFile "{{ target_sqlscripts_dir }}set.SQLFacts.sql" -ServerInstance "{{ mssql_server_name }}" -Database master | Select-Object * -ExcludeProperty  ItemArray, Table, RowError, RowState, HasErrors | ConvertTo-Json
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: '{{ ansible_user }}'
+    ansible_become_pass: '{{ ansible_password }}'
+  register: result_sqlfacts
+  tags: get_SQLFacts
+  any_errors_fatal: true
+  check_mode: no
+
+- name: Set SQLServer Facts
+  set_fact:
+    sqlfacts: "{{ result_sqlfacts.stdout | from_json }}"
+  any_errors_fatal: true
+  tags: set_SQLFacts
+  
+- name: Debug SQLServer Facts
+  debug:
+    msg: "{{ sqlfacts }}"
+  tags: debug_SQLFacts
+
+- name: Execute AG Primary Node Tasks..
+  block:
+    - import_tasks: primary_tasks.yml
+  ignore_errors: yes
+  tags: execute_primary_tasks
+  when: sqlfacts.hadr_replica_role == 'PRIMARY' and sqlfacts.hadr_primary_replica == ansible_hostname
+
+- name: Execute AG Secondary Node Tasks..
+  block:
+    - import_tasks: secondary_tasks.yml
+  ignore_errors: yes
+  tags: execute_secondary_tasks
+  when: sqlfacts.hadr_replica_role == 'SECONDARY' and sqlfacts.hadr_primary_replica == ansible_hostname

@@ -1,0 +1,32 @@
+---
+#Main task file for mssql-sa-post-install
+
+- name: Execute pre_tasks
+  block:
+    - import_tasks: pre_tasks.yml
+  any_errors_fatal: true
+  tags: execute_pre_tasks
+
+- name: Get SQLServer Facts
+  win_shell: | 
+    Invoke-SqlCmd -InputFile "{{ target_sqlscripts_dir }}set.SQLFacts.sql" -ServerInstance "{{ ansible_hostname }}" -Database master | Select-Object * -ExcludeProperty  ItemArray, Table, RowError, RowState, HasErrors | ConvertTo-Json
+  register: result_sqlfacts
+  tags: get_SQLFacts
+  check_mode: no
+
+- name: Set SQLServer Facts
+  set_fact:
+    sqlfacts: "{{ result_sqlfacts.stdout | from_json }}"
+  tags: set_SQLFacts
+
+- name: Debug
+  debug:
+    msg: "{{ sqlfacts }}"
+  tags: debug_SQLFacts
+
+- name: Execute sql_tasks  
+  block:
+    - import_tasks: sql_tasks.yml
+  ignore_errors: yes
+  tags: execute_sql_tasks
+  when: sqlfacts.mssql_hadr_status == 0 and sqlfacts.mssql_is_clustered == 0

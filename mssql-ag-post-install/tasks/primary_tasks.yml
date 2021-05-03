@@ -1,0 +1,481 @@
+---
+# tasks file for mssql-clu-post-install: active_tasks
+
+# - name: SQLServer | Create DBTools AD Logins
+#   win_dsc:
+#     resource_name: SqlLogin
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     Ensure: Present
+#     LoginType: "{{ item.logintype }}"
+#     Name: "{{ item.loginname }}"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   loop:
+#     - { loginname: "{{ svc_tools_admin_account }}", logintype: 'WindowsGroup' }
+#     - { loginname: "{{ svc_tools_read_account }}", logintype: 'WindowsGroup' }
+#   tags: add_DBTADLogins
+
+# - name: SQLServer | Add Sys Roles to DBTools AD Logins
+#   win_dsc:
+#     resource_name: SqlRole
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     Ensure: Present
+#     ServerRoleName: sysadmin
+#     MembersToInclude: "{{ item }}"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   with_items:
+#     - "{{ svc_tools_admin_account }}" 
+#   tags: add_DBTADLogins
+
+# - name: SQLServer | Create DB User for DBTools AD Login
+#   win_dsc:
+#     resource_name: SqlDatabaseUser
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     DatabaseName: "{{ item.dbname }}"
+#     Name: "{{ item.sqluser }}"
+#     LoginName: "{{ item.sqllogin }}"
+#     UserType: 'Login'  
+#     Ensure: Present
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   loop:
+#     - { sqllogin: "{{ svc_tools_read_account }}", dbname: 'master', sqluser: "{{ svc_tools_read_account }}" }  
+#   tags: add_DBTADLogins
+
+# - name: SQLServer | Add DB Roles to DBTools AD Logins
+#   win_dsc:
+#     resource_name: SqlDatabaseRole
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     DatabaseName: "{{ item.dbname }}"
+#     Name: "{{ item.dbrole }}"      
+#     Ensure: Present
+#     MembersToInclude: "{{ item.loginname }}"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   loop:
+#     - { loginname: "{{ svc_tools_read_account }}", dbname: 'master', dbrole: 'db_datareader' }  
+#   tags: add_DBTADLogins
+
+# - name: SQL Server | Check SQL Database service exists and set start mode to Automatic
+#   win_service: 
+#     name: "{{ mssql_instance_name }}"
+#     state: started
+#     start_mode: manual
+#   register: result_sdb
+#   tags: check_SQLServiceExists
+
+# - name: check SQL Agent service exists
+#   win_service: 
+#     name: "{{ mssql_agent_name }}"
+#     state: started
+#     start_mode: manual
+#   register: result_sdbag
+#   tags: check_SQLAgentExists
+
+# - name: Windows | Grant volume maintenance tasks & LPIM to SQL Server service account (securitypolicydsc)
+#   win_user_right:
+#     name: "{{ item }}"
+#     users: "{{ sqlfacts.mssql_service_account }}"
+#     action: add
+#   with_items:
+#     - SeLockMemoryPrivilege
+#     - SeManageVolumePrivilege
+#   tags: config_LPIMPVMT
+
+- name: Windows Primary Node | Change power plan to high performance
+  win_power_plan:
+    name: high performance
+  tags: config_PowerPlan
+
+# - name: SQLServer |Enable Network Protocols
+#   win_dsc:
+#     resource_name: SqlProtocol
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     ProtocolName: "{{ item }}"
+#     Enabled: True
+#     SuppressRestart: "{{ mssql_suppress_reboot }}"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   with_items:
+#     - TcpIp
+#     - NamedPipes
+#     - SharedMemory
+#   tags: enable_SQLNWProtocols
+
+# - name: SQLServer | Configurations..
+#   win_dsc:
+#     resource_name: SqlConfiguration 
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     OptionName: "{{ item.optionname }}"
+#     OptionValue: "{{ item.optionvalue }}"
+#   loop:
+#     - { optionname: 'Database Mail XPs', optionvalue: '1' }
+#     - { optionname: 'remote admin connections', optionvalue: '1' }
+#     - { optionname: 'backup compression default', optionvalue: '1' }
+#     - { optionname: 'optimize for ad hoc workloads', optionvalue: '1' }
+#     - { optionname: 'xp_cmdshell', optionvalue: '1' }
+#     - { optionname: 'remote access', optionvalue: '0' }
+#   tags: set_SQLConfigurations  
+
+# - name: SQLAgent | EnableDatabaseMail..
+#   win_dsc:
+#     resource_name: SqlDatabaseMail 
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     Ensure: present
+#     AccountName: "{{ dbmail_AccountName }}"
+#     ProfileName: "{{ dbmail_ProfileName }}"
+#     EmailAddress: "{{ dbmail_EmailAddress }}"
+#     ReplyToAddress: "{{ dbmail_ReplyToAddress }}"
+#     DisplayName: "{{ dbmail_DisplayName }}"
+#     MailServerName: "{{ dbmail_MailServerName }}"
+#     Description: "{{ dbmail_Description }}"
+#     LoggingLevel: 'Normal'
+#     TcpPort: 25
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: config_DatabaseMail
+
+# - name: SQLAgent | Send Test E-Mail
+#   win_shell: | 
+#     Invoke-SqlCmd -InputFile "{{ target_sqlscripts_testdir }}test.send_test_email.sql" -ServerInstance "{{ mssql_server_name }}" -Database master
+#   become: yes
+#   become_method: runas
+#   vars:
+#     ansible_become_user: '{{ ansible_user }}'
+#     ansible_become_pass: '{{ ansible_password }}'
+#   tags: config_DatabaseMail
+
+# - name: SQLServer | Set SqlTraceFlags - 2012/2014/2016
+#   win_dsc:
+#     resource_name: SqlTraceFlag
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     TraceFlagsToInclude: '3226, 4199, 1118'
+#     TraceFlagsToExclude: null
+#     RestartService: False
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: config_TraceFlags
+#   when: sqlfacts.mssql_major_version == 'SQL2012' or sqlfacts.mssql_major_version == 'SQL2014' or sqlfacts.mssql_major_version == 'SQL2016'
+
+# - name: SQLServer | Set SqlTraceFlags - 2017/2019
+#   win_dsc:
+#     resource_name: SqlTraceFlag
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     TraceFlagsToInclude: '3226'
+#     TraceFlagsToExclude: null
+#     RestartService: False
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: config_TraceFlags  
+#   when: sqlfacts.mssql_major_version == 'SQL2017' or sqlfacts.mssql_major_version == 'SQL2019'
+
+# - name: SQLServer | Adjust Max Degree of Parallelism
+#   win_dsc:
+#     resource_name: SqlMaxDop 
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     Ensure: 'Present'
+#     DynamicAlloc: True
+#     MaxDop: null
+#     ProcessOnlyOnActiveNode: False
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: config_MaxDopInstance
+
+# - name: SQLServer | Adjust Max Memory
+#   win_dsc:
+#     resource_name: SqlMemory
+#     Ensure: 'Present'
+#     DynamicAlloc: True
+#     MaxMemory: null
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     ProcessOnlyOnActiveNode: True
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: config_MaxMemory
+
+# - name: SQLAgent | Set SQL Agent Operator
+#   win_dsc:
+#     resource_name: SqlAgentOperator
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     Ensure: 'Present'
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#     Name: dbamail
+#     EmailAddress: dbamail@incomm.com
+#   tags: config_DbaOperator
+
+# - name: SQLAgent | Set Severity Alerts 1
+#   win_dsc:
+#     resource_name: SqlAgentAlert
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     Ensure: 'Present'
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#     Name: "{{ item.name }}"
+#     Severity: "{{ item.severity }}"
+#   loop:
+#     - { name: 'Sev17', severity: '17' }
+#     - { name: 'Sev18', severity: '18' }
+#     - { name: 'Sev19', severity: '19' }
+#     - { name: 'Sev20', severity: '20' }
+#     - { name: 'Sev21', severity: '21' }
+#     - { name: 'Sev22', severity: '22' }
+#     - { name: 'Sev23', severity: '23' }
+#     - { name: 'Sev24', severity: '24' }
+#     - { name: 'Sev25', severity: '25' }
+#   tags: config_SeverityAlerts1
+
+# - name: SQLAgent | Set Severity Alerts 2
+#   win_dsc:
+#     resource_name: SqlAgentAlert
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     Ensure: 'Present'
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#     Name: "{{ item.name }}"
+#     MessageId: "{{ item.msgid }}"
+#   loop:
+#     - { name: 'Error Number 823', msgid: '823' }
+#     - { name: 'Error Number 824', msgid: '824' }
+#     - { name: 'Error Number 825', msgid: '825' }
+#   tags: config_SeverityAlerts2
+
+# - name: SQLServer | Execute add_notification_sev_alerts
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.add_notification_sev_alerts.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.add_notification_sev_alerts.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.add_notification_sev_alerts.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: add_NotificationforSevAlerts
+
+# - name: SQLServer | Execute modify_Server_Security_Configuration
+#   win_dsc:
+#     resource_name: SqlLogin
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     Name: sa
+#     LoginType: SqlLogin
+#     LoginMustChangePassword: False
+#     LoginPasswordExpirationEnabled: False
+#     LoginPasswordPolicyEnforced: False
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: config_SALoginPwdPolicy
+
+# - name: SQLServer | Configure SQLAgent Properties
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.SQL_Agent_Properties.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.SQL_Agent_Properties.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.SQL_Agent_Properties.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: config_SQLAgentProperties
+
+# - name: SQLServer | Execute sp_whoisactive
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.sp_whoisactive.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.sp_whoisactive.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.sp_whoisactive.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: install_sp_whoisactive
+
+# - name: SQLServer | Check DBAUtility database exists..
+#   win_dsc:
+#     resource_name: SqlDatabase 
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     Name: DBAUtility
+#     OwnerName: 'sa'
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#     Ensure: present
+#   tags: create_DBAUtilityDB
+
+# - name: SQLServer | Execute sp_sendmailnotification
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.sp_sendmailnotification.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.sp_sendmailnotification.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.sp_sendmailnotification.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: install_sendmailnotification
+
+# - name: SQLServer | Execute msdb_cleanup_backuphistory
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.msdb_cleanup_backuphistory.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.msdb_cleanup_backuphistory.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.msdb_cleanup_backuphistory.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: install_msdb_cleanup_backuphistory
+
+# - name: SQLServer | Execute Maintenance_purge_msdb_history
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.Maintenance_purge_msdb_history.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.Maintenance_purge_msdb_history.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.Maintenance_purge_msdb_history.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: install_Maintenance_purge_msdb_history
+
+# - name: SQLServer | Execute db_growth_history
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.db_growth_history.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.db_growth_history.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.db_growth_history.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: install_db_growth_history
+
+# - name: SQLServer | Execute sp_db_growth_history
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.sp_db_growth_history.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.sp_db_growth_history.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.sp_db_growth_history.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: install_sp_db_growth_history
+
+# - name: SQLServer | Execute Maintenance_db_growth_history
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.Maintenance_db_growth_history.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.Maintenance_db_growth_history.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.Maintenance_db_growth_history.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: install_Maintenance_db_growth_history
+
+# - name: SQLServer | Execute cycle_sql_error_log
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.cycle_sql_error_log.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.cycle_sql_error_log.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.cycle_sql_error_log.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: install_cycle_sql_error_log
+
+# - name: SQLServer | Execute SQLAuditLogin_Job
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ mssql_server_name }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.SQLAuditLogin_Path_Job.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.SQLAuditLogin_Path_Job.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.SQLAuditLogin_Path_Job.sql"
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"
+#   tags: install_SQLAuditLogin_Job
+
+# - name: SQLServer | Insert record into InventoryDB
+#   win_dsc:
+#     resource_name: SqlScript
+#     ServerName: "{{ inv_host }}"
+#     InstanceName: "{{ mssql_instance_name }}"
+#     SetFilePath: "{{ target_sqlscripts_setdir }}set.add_server_to_db_inventory.sql"
+#     TestFilePath: "{{ target_sqlscripts_testdir }}test.add_server_to_db_inventory.sql"
+#     GetFilePath: "{{ target_sqlscripts_getdir }}get.add_server_to_db_inventory.sql"
+#     Variable: ['InvServerName={{ mssql_server_name }}','Env={{ inv_env }}','Loc={{ inv_loc }}','Cat={{ inv_cat }}','HType={{ inv_htype }}','Plat={{ inv_plat }}','Dom={{ inv_dom }}','Usr={{ ansible_user }}']
+#     PsDscRunAsCredential_username: "{{ ansible_user }}"
+#     PsDscRunAsCredential_password: "{{ ansible_password }}"    
+#   tags: add_Record_to_InventoryDB
+
+# ## - name: SQLServer | Execute Index Maintenance Scripts
+# ##   win_dsc:
+# ##     resource_name: SqlScript
+# ##     ServerName: "{{ mssql_server_name }}"
+# ##     InstanceName: "{{ mssql_instance_name }}"
+# ##     SetFilePath: "{{ target_sqlscripts_setdir }}/{{ item.set }}"
+# ##     TestFilePath: "{{ target_sqlscripts_testdir }}/{{ item.test }}"
+# ##     GetFilePath: "{{ target_sqlscripts_getdir }}/{{ item.get }}"
+# ##     PsDscRunAsCredential_username: "{{ ansible_user }}"
+# ##     PsDscRunAsCredential_password: "{{ ansible_password }}"
+# ##   loop:
+# ##     - { test: "test.IM00_rename_index_defrag_objects_to_old.sql", get: "get.IM00_rename_index_defrag_objects_to_old.sql", set: "set.IM00_rename_index_defrag_objects_to_old.sql" }
+# ##     - { test: "test.IM01_dba create index defrag objects.sql", get: "get.IM01_dba create index defrag objects.sql", set: "set.IM01_dba create index defrag objects.sql" }
+# ##     - { test: "test.IM02_dba create update stats objects.sql", get: "get.IM02_dba create update stats objects.sql", set: "set.IM02_dba create update stats objects.sql" }
+# ##     - { test: "test.IM03_dba mm parse string.sql", get: "get.IM03_dba mm parse string.sql", set: "set.IM03_dba mm parse string.sql" }
+# ##     - { test: "test.IM04_dba index defrag replace special chars.sql", get: "get.IM04_dba index defrag replace special chars.sql", set: "set.IM04_dba index defrag replace special chars.sql" }    
+# ##     - { test: "test.IM05_dba defragidx find sit off objects.sql", get: "get.IM05_dba defragidx find sit off objects.sql", set: "set.IM05_dba defragidx find sit off objects.sql" }
+# ##     - { test: "test.IM06_dba defragidx find sit on objects.sql", get: "get.IM06_dba defragidx find sit on objects.sql", set: "set.IM06_dba defragidx find sit on objects.sql" }
+# ##     - { test: "test.IM07_dba defragidx include exclude objects.sql", get: "get.IM07_dba defragidx include exclude objects.sql", set: "set.IM07_dba defragidx include exclude objects.sql" }
+# ##     - { test: "test.IM08_dba findfrag exclude indices by index.sql", get: "get.IM08_dba findfrag exclude indices by index.sql", set: "set.IM08_dba findfrag exclude indices by index.sql" }
+# ##     - { test: "test.IM09_dba findfrag exclude indices by schema.sql", get: "get.IM09_dba findfrag exclude indices by schema.sql", set: "set.IM09_dba findfrag exclude indices by schema.sql" }
+# ##     - { test: "test.IM10_dba findfrag exclude indices by table.sql", get: "get.IM10_dba findfrag exclude indices by table.sql", set: "set.IM10_dba findfrag exclude indices by table.sql" }    
+# ##     - { test: "test.IM11_dba findfrag get indices by index.sql", get: "get.IM11_dba findfrag get indices by index.sql", set: "set.IM11_dba findfrag get indices by index.sql" }
+# ##     - { test: "test.IM12_dba findfrag get indices by schema.sql", get: "get.IM12_dba findfrag get indices by schema.sql", set: "set.IM12_dba findfrag get indices by schema.sql" }
+# ##     - { test: "test.IM13_dba findfrag get indices by table.sql", get: "get.IM13_dba findfrag get indices by table.sql", set: "set.IM13_dba findfrag get indices by table.sql" }    
+# ##     - { test: "test.IM14_dba find index fragmentation.sql", get: "get.IM14_dba find index fragmentation.sql", set: "set.IM14_dba find index fragmentation.sql" }
+# ##     - { test: "test.IM15_dba index defrag.sql", get: "get.IM15_dba index defrag.sql", set: "set.IM15_dba index defrag.sql" }
+# ##     - { test: "test.IM16_dba update stats.sql", get: "get.IM16_dba update stats.sql", set: "set.IM16_dba update stats.sql" }
+# ##     - { test: "test.IM17_dba monitor index defrag.sql", get: "get.IM17_dba monitor index defrag.sql", set: "set.IM17_dba monitor index defrag.sql" }
+# ##     - { test: "test.IM18_dba index maintenance job script.sql", get: "get.IM18_dba index maintenance job script.sql", set: "set.IM18_dba index maintenance job script.sql" }
+# ##     - { test: "test.IM19_dba index maintenance monitor job script.sql", get: "get.IM19_dba index maintenance monitor job script.sql", set: "set.IM19_dba index maintenance monitor job script.sql" }
+# ##     - { test: "test.IM20_dba update stats job script.sql", get: "get.IM20_dba update stats job script.sql", set: "set.IM20_dba update stats job script.sql" }
+# ##   tags: install_SQLIndexMaintScripts
+
+# - name: SQLServer | TempDB Configuration
+#   win_shell: | 
+#     Set-DbaTempDbConfig -SqlInstance "{{ mssql_server_name }}" -DataFileSize "{{ tempdb_DataFileSize }}" -DataFileGrowth "{{ tempdb_DataFileGrowth }}" -LogFileSize "{{ tempdb_LogFileSize }}" -LogFileGrowth "{{ tempdb_LogFileGrowth }}" -WarningAction SilentlyContinue -WarningVariable WrnVar
+#     Write-host $WrnVar
+#   register: WrnMsg
+#   failed_when: WrnMsg.stdout is search('not suitable to be reconfigured')
+#   become: yes
+#   become_method: runas
+#   become_user: "{{ ansible_user }}"
+#   vars:
+#     ansible_become_pass: "{{ ansible_password }}"
+#   tags: config_TempDB
+
+# - name: SQLServer | TempDB Debug
+#   debug:
+#     msg: "{{ WrnMsg.stdout }}"
+#   tags: debug_TempDB
+#   when: WrnMsg.stdout | length > 0
+  

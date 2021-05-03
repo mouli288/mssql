@@ -1,0 +1,83 @@
+---
+#tasks file for mssql-clu-post-install: pre_tasks
+
+# Ansible prerequisites
+
+- name: Windows | Install .NET Framework 4.5 Features
+  win_feature:
+    name: 
+      - NET-Framework-45-Core
+      - NET-WCF-TCP-PortSharing45
+      - Telnet-Client
+      - RSAT-AD-PowerShell
+    state: present
+    include_sub_features: False
+    reboot_required: False  
+  tags: config_WindowsRoles
+
+- name: Create directory structure to copy files
+  win_file:
+    path: "{{ item }}"
+    state: directory
+  with_items:  
+    - D:\Ansible\SQLScripts\
+    - D:\Ansible\OutputLogs\
+  tags: create_Directories  
+
+- name: Powershell | Copy DSC modules
+  win_copy:
+    src: "{{ source_ps_sqldsc_module_dir }}"
+    dest: "{{ target_ps_sqldsc_module_dir }}"
+    remote_src: yes
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: "{{ ansible_user }}"
+    ansible_become_pass: "{{ ansible_password }}"
+  tags: copy_PSDSCModules
+
+- name: Powershell | Copy NuGet Package Provider modules
+  win_copy:
+    src: "{{ source_ps_nuget_dir }}"
+    dest: "{{ target_ps_nuget_dir }}"
+    remote_src: yes
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: "{{ ansible_user }}"
+    ansible_become_pass: "{{ ansible_password }}"
+  tags: copy_NuGetPkgProvider
+  check_mode: no
+
+- name: Powershell | Copy SQL Scripts
+  win_copy:
+    src: "{{ source_sqlscripts_dir }}"
+    dest: "{{ target_sqlscripts_dir }}"
+    force: yes
+    remote_src: yes
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: "{{ ansible_user }}"
+    ansible_become_pass: "{{ ansible_password }}"
+  tags: copy_SQLScripts
+
+- name: Powershell | Check for Powershell modules on {{ansible_hostname}}
+  win_psmodule:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - ServerManager
+    - dbatools
+    - SQLServerDsc
+    - StorageDsc
+  tags: import_PSModules
+
+- name: Windows | Add Ansible User to SecPol
+  win_user_right:
+    name: "{{ item }}"
+    users: "{{ ansible_user }}"
+    action: add
+  with_items:
+    - SeServiceLogonRight
+  tags: add_AnsibleUserToSeServiceLogonRight

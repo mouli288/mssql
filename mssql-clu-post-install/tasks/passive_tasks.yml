@@ -1,0 +1,80 @@
+---
+##tasks file for mssql-clu-post-install: passive_tasks
+
+# - name: Debug
+#   debug:
+#     msg: "{{ sqlfacts }}"
+#   tags: debug_SQLFacts
+
+- name: SQL Server | Check SQL Database service exists and set start mode to Manual
+  win_service: 
+    name: "{{ mssql_instance_name }}"
+    state: stopped
+    start_mode: manual
+  register: result_sdb
+  tags: check_SQLServiceExists
+
+- name: check SQL Agent service exists
+  win_service: 
+    name: "{{ mssql_agent_name }}"
+    state: stopped
+    start_mode: manual
+  register: result_sdbag
+  tags: check_SQLAgentExists
+
+- name: Windows Passive Node| Grant volume maintenance tasks & LPIM to SQL Server service account
+  win_user_right:
+    name: "{{ item }}"
+    users: "{{ sqlfacts.mssql_service_account }}"
+    action: add
+  with_items:
+    - SeLockMemoryPrivilege
+    - SeManageVolumePrivilege
+  tags: config_LPIMPVMT
+
+- name: Windows-PassiveNode | Change power plan to high performance
+  win_power_plan:
+    name: high performance
+  tags: config_PowerPlan
+
+- name: SQLServer |Enable Network Protocols
+  win_dsc:
+    resource_name: SqlProtocol
+    ServerName: "{{ mssql_server_name }}"
+    InstanceName: "{{ mssql_instance_name }}"
+    ProtocolName: "{{ item }}"
+    Enabled: True
+    SuppressRestart: "{{ mssql_suppress_reboot }}"
+    PsDscRunAsCredential_username: "{{ ansible_user }}"
+    PsDscRunAsCredential_password: "{{ ansible_password }}"
+  with_items:
+    - TcpIp
+    - NamedPipes
+    - SharedMemory
+  tags: enable_SQLNWProtocols
+
+- name: SQLServer | Set SqlTraceFlags - 2012/2014/2016
+  win_dsc:
+    resource_name: SqlTraceFlag
+    ServerName: "{{ mssql_server_name }}"
+    InstanceName: "{{ mssql_instance_name }}"
+    TraceFlagsToInclude: '3226, 4199, 1118'
+    TraceFlagsToExclude: null
+    RestartService: False
+    PsDscRunAsCredential_username: "{{ ansible_user }}"
+    PsDscRunAsCredential_password: "{{ ansible_password }}"
+  tags: config_TraceFlags
+  when: sqlfacts.mssql_major_version == 'SQL2012' or sqlfacts.mssql_major_version == 'SQL2014' or sqlfacts.mssql_major_version == 'SQL2016'
+
+- name: SQLServer | Set SqlTraceFlags - 2017/2019
+  win_dsc:
+    resource_name: SqlTraceFlag
+    ServerName: "{{ mssql_server_name }}"
+    InstanceName: "{{ mssql_instance_name }}"
+    TraceFlagsToInclude: '3226'
+    TraceFlagsToExclude: null
+    RestartService: False
+    PsDscRunAsCredential_username: "{{ ansible_user }}"
+    PsDscRunAsCredential_password: "{{ ansible_password }}"
+  tags: config_TraceFlags  
+  when: sqlfacts.mssql_major_version == 'SQL2017' or sqlfacts.mssql_major_version == 'SQL2019'

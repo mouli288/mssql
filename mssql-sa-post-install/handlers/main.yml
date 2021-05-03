@@ -1,0 +1,19 @@
+---
+# handlers file for mssql-post-install
+- name: reboot windows
+  win_reboot:
+    reboot_timeout: 3600
+    post_reboot_delay: 60
+  when: mssql_suppress_reboot == False
+
+- name: restart sqlserver
+  win_service:
+    name: MSSQLSERVER
+    state: restarted
+
+- name: restart sqlagent
+  win_service:
+    name: SQLSERVERAGENT
+    state: restarted
+
+

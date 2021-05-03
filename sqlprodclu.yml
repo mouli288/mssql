@@ -1,0 +1,42 @@
+# vars
+
+### File and Folder Paths ###
+
+# Powershell modules source and target
+source_ps_sqldsc_module_dir: \\SPVCEISL02V.uss.net\INCOMM_OPSDBA$\Ansible\PSModules\
+target_ps_sqldsc_module_dir: C:\Program Files\WindowsPowerShell\Modules\
+
+# Powershell Nuget package provider source and target
+source_ps_nuget_dir: \\SPVCEISL02V.uss.net\INCOMM_OPSDBA$\Ansible\NuGet\
+target_ps_nuget_dir: C:\Program Files\PackageManagement\ProviderAssemblies\
+
+# Post intall SQL Scripts source and target
+source_sqlscripts_dir: \\SPVCEISL02V.uss.net\INCOMM_OPSDBA$\Ansible\SQLScripts\
+target_sqlscripts_dir: D:\Ansible\SQLScripts\
+target_sqlscripts_getdir: D:\Ansible\SQLScripts\get\
+target_sqlscripts_setdir: D:\Ansible\SQLScripts\set\
+target_sqlscripts_testdir: D:\Ansible\SQLScripts\test\
+target_sqlscripts_output_dir: D:\Ansible\OutputLogs\
+
+#DBMail Config
+dbmail_AccountName: 'rptsqlprd'
+dbmail_ProfileName: 'DBA_Notifications'
+dbmail_EmailAddress: 'rptsqlprd@incomm.com'
+dbmail_ReplyToAddress: 'no-reply@incomm.com'
+dbmail_DisplayName: 'rptsqlprd'
+dbmail_MailServerName: 'DLP-SPDB-C3.incomm.com'
+dbmail_Description: 'Account for Automated DBA Notifications of PROD SQL Instances'
+
+# Tools Accounts
+svc_tools_admin_account: CALLING\db.tools_svc_admin_accounts
+svc_tools_read_account: CALLING\db.tools_svc_read_accounts
+snow_account: CALLING\svc_snow_prd
+
+# Inventory Record Details
+inv_host: SPDBASQL01V
+inv_htype: CLUSTER
+inv_env: PROD
+inv_loc: QTS
+inv_cat: 3
+inv_plat: SQLSERVER
+inv_dom: CALLING

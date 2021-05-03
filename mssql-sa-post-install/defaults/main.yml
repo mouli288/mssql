@@ -1,0 +1,21 @@
+---
+# defaults file for mssql-post-install
+
+# instance details
+mssql_instance_name: MSSQLSERVER
+mssql_agent_name: SQLSERVERAGENT
+mssql_version: 
+
+# Suppress reboots that may occur during SQL Setup tasks
+# you will want to set this to True if working on a sensitive system:
+mssql_suppress_reboot: True
+
+# instance configuration details
+mssql_max_degree_of_parallelism: 0
+
+
+# TempDB Configuration
+tempdb_DataFileSize: 8192
+tempdb_DataFileGrowth: 64
+tempdb_LogFileSize: 1024
+tempdb_LogFileGrowth: 64

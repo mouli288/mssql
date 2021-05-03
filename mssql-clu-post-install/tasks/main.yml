@@ -1,0 +1,85 @@
+---
+#Main task file for mssql-clu-post-install
+
+- name: Execute Pre-Requisites
+  block:
+    - import_tasks: pre_tasks.yml
+  any_errors_fatal: true
+  tags: execute_pre_tasks
+
+- name: Windows | Get Cluster Active Node
+  win_shell: | 
+    (get-clustergroup | where Name -Match 'SQL Server').ownernode.name
+  register: result_CluActiveNode
+  tags: get_CluActiveNode
+  any_errors_fatal: true
+  check_mode: no
+
+- name: Windows | Set Cluster Active Node as Fact
+  set_fact:
+    clufacts: "{{ result_CluActiveNode.stdout | regex_replace('(\\r\\n)','') }}"
+  any_errors_fatal: true
+  tags: set_CluFacts
+
+- name: Ansible | Create Ansible User & Assign Roles based on Active Cluster Node
+  block:
+    - name: SQLServer | Create Ansible AD Login
+      win_dsc:
+        resource_name: SqlLogin
+        ServerName: "{{ mssql_server_name }}"
+        InstanceName: "{{ mssql_instance_name }}"
+        Ensure: Present
+        LoginType: WindowsUser
+        Name: "{{ ansible_user }}" 
+      tags: create_AnsibleADLogin
+
+    - name: SQLServer | Add Roles to Ansible AD Login
+      win_dsc:
+        resource_name: SqlRole
+        ServerName: "{{ mssql_server_name }}"
+        InstanceName: "{{ mssql_instance_name }}"
+        Ensure: Present
+        ServerRoleName: sysadmin
+        MembersToInclude: "{{ ansible_user }}"
+      tags: add_RolestoAnsibleADLogin
+  any_errors_fatal: true
+  when: "clufacts == ansible_hostname"       
+  check_mode: no
+  
+- name: Get SQLServer Facts
+  win_shell: | 
+    Invoke-SqlCmd -InputFile "{{ target_sqlscripts_dir }}set.SQLFacts.sql" -ServerInstance "{{ mssql_server_name }}" -Database master | Select-Object * -ExcludeProperty  ItemArray, Table, RowError, RowState, HasErrors | ConvertTo-Json
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: '{{ ansible_user }}'
+    ansible_become_pass: '{{ ansible_password }}'
+  register: result_sqlfacts
+  any_errors_fatal: true
+  tags: get_SQLFacts
+  check_mode: no
+
+- name: Set SQLServer Facts
+  set_fact:
+    sqlfacts: "{{ result_sqlfacts.stdout | from_json }}"
+  any_errors_fatal: true
+  tags: set_SQLFacts
+
+- name: Debug
+  debug:
+    msg: "{{ sqlfacts }}"
+  tags: debug_SQLFacts
+
+- name: Execute Cluster Active Node Tasks..
+  block:
+    - import_tasks: active_tasks.yml
+  ignore_errors: yes
+  tags: execute_active_tasks
+  when: sqlfacts.mssql_is_clustered == 1 and sqlfacts.cluster_active_node == ansible_hostname
+
+- name: Execute Cluster Passive Node Tasks..
+  block:
+    - import_tasks: passive_tasks.yml
+  ignore_errors: yes
+  tags: execute_passive_tasks
+  when: sqlfacts.mssql_is_clustered == 1 and sqlfacts.cluster_passive_node == ansible_hostname

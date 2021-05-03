@@ -1,0 +1,103 @@
+---
+#pre-tasks file for mssql-sa-post-install
+
+## Ansible prerequisites
+
+- name: Windows | Install .NET Framework 4.5 Features
+  win_feature:
+    name: 
+      - NET-Framework-45-Core
+      - NET-WCF-TCP-PortSharing45
+      - Telnet-Client
+      - RSAT-AD-PowerShell
+    state: present
+    include_sub_features: False
+    reboot_required: False  
+  tags: config_WindowsRoles
+
+- name: Create directory structure to copy files
+  win_file:
+    path: "{{ item }}"
+    state: directory
+  with_items:  
+    - X:\Ansible\SQLScripts\
+    - X:\Ansible\OutputLogs\
+  tags: create_Directories  
+
+- name: Powershell | Copy DSC modules
+  win_copy:
+    src: "{{ source_ps_sqldsc_module_dir }}"
+    dest: "{{ target_ps_sqldsc_module_dir }}"
+    remote_src: yes
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: "{{ ansible_user }}"
+    ansible_become_pass: "{{ ansible_password }}"
+  tags: copy_PSDSCModules
+
+- name: Powershell | Copy NuGet Package Provider modules
+  win_copy:
+    src: "{{ source_ps_nuget_dir }}"
+    dest: "{{ target_ps_nuget_dir }}"
+    remote_src: yes
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: "{{ ansible_user }}"
+    ansible_become_pass: "{{ ansible_password }}"
+  tags: copy_NuGetPkgProvider
+
+- name: Powershell | Copy SQL Scripts
+  win_copy:
+    src: "{{ source_sqlscripts_dir }}"
+    dest: "{{ target_sqlscripts_dir }}"
+    force: yes
+    remote_src: yes
+  become: yes
+  become_method: runas
+  vars:
+    ansible_become_user: "{{ ansible_user }}"
+    ansible_become_pass: "{{ ansible_password }}"
+  tags: copy_SQLScripts
+
+- name: Powershell | Check for required Powershell modules on {{ansible_hostname}}
+  win_psmodule:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - ServerManager
+    - dbatools
+    - SQLServerDsc
+    - StorageDsc
+  register: result_psmod2
+  tags: import_PSModules2
+
+- name: SQLServer | Create Ansible AD Login
+  win_dsc:
+    resource_name: SqlLogin
+    ServerName: "{{ ansible_hostname }}"
+    InstanceName: "{{ mssql_instance_name }}"
+    Ensure: Present
+    LoginType: WindowsUser
+    Name: "{{ ansible_user }}" 
+  tags: create_AnsibleADLogin
+
+- name: SQLServer | Add Roles to Ansible AD Login
+  win_dsc:
+    resource_name: SqlRole
+    ServerName: "{{ ansible_hostname }}"
+    InstanceName: "{{ mssql_instance_name }}"
+    Ensure: Present
+    ServerRoleName: sysadmin
+    MembersToInclude: "{{ ansible_user }}"
+  tags: add_RolestoAnsibleADLogin
+
+- name: Windows | Add Ansible User to SecPol
+  win_user_right:
+    name: "{{ item }}"
+    users: "{{ ansible_user }}"
+    action: add
+  with_items:
+    - SeServiceLogonRight
+  tags: add_AnsibleUserToSeServiceLogonRight  
