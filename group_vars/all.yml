@@ -1,6 +1,6 @@
 # vars
 
-ansible_user: 'CALLING\svc_llsdbexec_dbt'
+ansible_user: 'metamanager\cpothina'
 ansible_password: "{{ vault_ansible_password }}"
 ansible_port: 5985
 ansible_connection: winrm
